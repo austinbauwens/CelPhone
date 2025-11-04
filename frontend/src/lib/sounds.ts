@@ -26,6 +26,7 @@ type SoundEffect =
 class SoundManager {
   private audioContext: AudioContext | null = null;
   private audioCache: Map<string, HTMLAudioElement> = new Map();
+  private decodedBufferCache: Map<string, AudioBuffer> = new Map(); // Cache decoded buffers for performance
   private soundEnabled: boolean = true;
 
   constructor() {
@@ -102,6 +103,7 @@ class SoundManager {
 
   // Play a sound file with fallback to programmatic tone
   // Applies low-pass filter to soften sharp 8-bit sounds
+  // Uses cached decoded buffers for performance
   private async playSound(soundName: SoundEffect, fallbackTone?: () => void) {
     if (!this.soundEnabled) return;
 
@@ -113,24 +115,35 @@ class SoundManager {
     const audio = await this.loadAudio(soundName);
     if (audio && this.audioContext) {
       try {
-        // Fetch and decode the audio file
-        const response = await fetch(audio.src);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        // Check if we have a cached decoded buffer (much faster)
+        const fileName = this.soundFiles[soundName];
+        let audioBuffer = fileName ? this.decodedBufferCache.get(fileName) : undefined;
+        
+        if (!audioBuffer) {
+          // Fetch and decode the audio file (only once, then cache)
+          const response = await fetch(audio.src);
+          const arrayBuffer = await response.arrayBuffer();
+          audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+          
+          // Cache the decoded buffer for future use
+          if (fileName) {
+            this.decodedBufferCache.set(fileName, audioBuffer);
+          }
+        }
 
         // Create a new audio source for this playback
         const source = this.audioContext.createBufferSource();
         source.buffer = audioBuffer;
 
-        // Create low-pass filter to soften sharp sounds
+        // Create low-pass filter to soften sharp sounds - more aggressive filtering
         const filter = this.audioContext.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.value = 2500; // Cut frequencies above 2.5kHz for softer sound
-        filter.Q.value = 1;
+        filter.frequency.value = 1800; // Lower cutoff (1.8kHz) for softer, warmer sound
+        filter.Q.value = 0.7; // Lower Q for gentler rolloff
 
         // Create gain node for volume control
         const gainNode = this.audioContext.createGain();
-        gainNode.gain.value = 0.15; // Quiet volume (15%)
+        gainNode.gain.value = 0.12; // Slightly quieter (12%) for gentler sound
 
         // Connect: source -> filter -> gain -> destination
         source.connect(filter);
@@ -146,11 +159,11 @@ class SoundManager {
       }
     }
 
-    // Fallback: simple playback without filter
+    // Fallback: simple playback without filter (but still quieter)
     if (audio) {
       try {
         const audioElement = new Audio(audio.src);
-        audioElement.volume = 0.15;
+        audioElement.volume = 0.12; // Quieter fallback too
         audioElement.onerror = () => {
           if (fallbackTone) fallbackTone();
         };
@@ -352,11 +365,11 @@ class SoundManager {
 
         const filter = this.audioContext.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.value = 2500;
-        filter.Q.value = 1;
+        filter.frequency.value = 1800; // Match softer filter settings
+        filter.Q.value = 0.7; // Gentler rolloff
 
         const gainNode = this.audioContext.createGain();
-        gainNode.gain.value = 0.05;
+        gainNode.gain.value = 0.04; // Even quieter for typing
 
         source.connect(filter);
         filter.connect(gainNode);
