@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Game } from '../types';
 
@@ -7,23 +7,33 @@ export function useGame(gameId: string | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  async function fetchGame() {
+  const fetchGame = useCallback(async () => {
+    if (!gameId) return;
+    
     try {
       setLoading(true);
+      // Only fetch essential fields for better performance
       const { data, error } = await supabase
         .from('games')
-        .select('*')
+        .select('id, status, current_round, total_rounds, frames_per_round, room_code, host_id, created_at, updated_at')
         .eq('id', gameId)
         .single();
 
       if (error) throw error;
-      setGame(data);
+      
+      // Only update if data actually changed to prevent unnecessary re-renders
+      setGame(prevGame => {
+        if (prevGame && JSON.stringify(prevGame) === JSON.stringify(data)) {
+          return prevGame;
+        }
+        return data;
+      });
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch game'));
     } finally {
       setLoading(false);
     }
-  }
+  }, [gameId]);
 
   useEffect(() => {
     if (!gameId) {
@@ -36,10 +46,11 @@ export function useGame(gameId: string | null) {
     fetchGame();
 
     // Always poll for game updates (works without realtime)
+    // Reduced polling frequency - 3 seconds is sufficient for game status updates
     let pollInterval: ReturnType<typeof setInterval> | null = null;
     pollInterval = setInterval(() => {
       fetchGame();
-    }, 1000); // Poll every second
+    }, 3000); // Poll every 3 seconds to reduce database load
 
     // Try realtime subscription (optional optimization)
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -67,10 +78,10 @@ export function useGame(gameId: string | null) {
             // Reduce polling frequency if realtime works (still keep as backup)
             if (pollInterval) {
               clearInterval(pollInterval);
-              // Poll every 2 seconds as backup
+              // Poll every 5 seconds as backup (realtime is primary)
               pollInterval = setInterval(() => {
                 fetchGame();
-              }, 2000);
+              }, 5000);
             }
           }
         });
@@ -87,7 +98,7 @@ export function useGame(gameId: string | null) {
         supabase.removeChannel(channel);
       }
     };
-  }, [gameId]);
+  }, [gameId, fetchGame]);
 
   return { game, loading, error, refetch: fetchGame };
 }

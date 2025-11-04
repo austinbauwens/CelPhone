@@ -67,26 +67,30 @@ class SoundManager {
     typing: 'tick.wav', // Use tick sound for typing
   };
 
-  // Load and cache an audio file
+  // Load and cache an audio file - optimized for performance
   private async loadAudio(soundName: SoundEffect): Promise<HTMLAudioElement | null> {
     const fileName = this.soundFiles[soundName];
     if (!fileName) return null;
 
-    // Check cache first
-    if (this.audioCache.has(fileName)) {
-      return this.audioCache.get(fileName)!;
+    // Check cache first (synchronous lookup for performance)
+    const cached = this.audioCache.get(fileName);
+    if (cached) {
+      return cached;
     }
 
     try {
       const audio = new Audio(`/sounds/${fileName}`);
       audio.volume = 0.15; // Quiet volume (15%)
-      
-      // Preload
-      audio.load();
-      
-      // Cache it
+      audio.preload = 'auto'; // Preload for better performance
+
+      // Cache immediately (before load completes) to avoid duplicate requests
       this.audioCache.set(fileName, audio);
-      
+
+      // Preload asynchronously (don't await)
+      audio.load().catch(() => {
+        // Silently handle load errors - will fallback to programmatic tone
+      });
+
       return audio;
     } catch (error) {
       console.warn(`Failed to load sound: ${fileName}`, error);
@@ -318,9 +322,10 @@ class SoundManager {
     });
   }
 
-  // Typing sound (very subtle)
+  // Typing sound (very subtle) - optimized for performance
   private lastTypingTime = 0;
   private typingThrottle = 50; // Minimum ms between typing sounds
+  private typingAudioCache: { buffer: AudioBuffer; source: AudioBufferSourceNode | null } | null = null;
   
   playTyping() {
     // Throttle typing sounds to avoid too many overlapping sounds
@@ -337,25 +342,52 @@ class SoundManager {
       this.initAudioContext();
     }
 
+    // Use cached audio buffer if available (much faster)
+    if (this.typingAudioCache && this.typingAudioCache.buffer && this.audioContext) {
+      try {
+        const source = this.audioContext.createBufferSource();
+        source.buffer = this.typingAudioCache.buffer;
+
+        const filter = this.audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 2500;
+        filter.Q.value = 1;
+
+        const gainNode = this.audioContext.createGain();
+        gainNode.gain.value = 0.05;
+
+        source.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        source.start(0);
+        return;
+      } catch (error) {
+        // Fallback if cached buffer fails
+      }
+    }
+
+    // Load and cache audio buffer on first use
     const audio = this.loadAudio('typing');
     audio.then((audioElement) => {
       if (audioElement && this.audioContext) {
         try {
-          // Fetch and decode the audio file with very low volume for typing
+          // Fetch and decode once, then cache the buffer
           fetch(audioElement.src)
             .then(response => response.arrayBuffer())
             .then(arrayBuffer => this.audioContext!.decodeAudioData(arrayBuffer))
             .then(audioBuffer => {
+              // Cache the decoded buffer for future use
+              this.typingAudioCache = { buffer: audioBuffer, source: null };
+              
+              // Play immediately
               const source = this.audioContext!.createBufferSource();
               source.buffer = audioBuffer;
 
-              // Create low-pass filter to soften
               const filter = this.audioContext!.createBiquadFilter();
               filter.type = 'lowpass';
               filter.frequency.value = 2500;
               filter.Q.value = 1;
 
-              // Very quiet gain for typing (5% volume)
               const gainNode = this.audioContext!.createGain();
               gainNode.gain.value = 0.05;
 

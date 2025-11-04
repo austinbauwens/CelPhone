@@ -1,10 +1,21 @@
+import { memo, useMemo, useCallback } from 'react';
 import { useDrawing } from './DrawingContext';
 import { soundManager } from '../../lib/sounds';
 
-export function ToolPanel() {
+export const ToolPanel = memo(function ToolPanel() {
   const { color, brushSize, tool, setColor, setBrushSize, setTool } = useDrawing();
 
-  const colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'];
+  const colors = useMemo(() => ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'], []);
+
+  const handleColorChange = useCallback((c: string) => {
+    soundManager.playClick();
+    setColor(c);
+  }, [setColor]);
+
+  const handleToolChange = useCallback((newTool: 'brush' | 'eraser' | 'paintbucket') => {
+    soundManager.playClick();
+    setTool(newTool);
+  }, [setTool]);
 
   return (
     <div className="tool-panel">
@@ -23,10 +34,7 @@ export function ToolPanel() {
                 key={c}
                 className={`color-swatch ${color === c ? 'active' : ''}`}
                 style={{ backgroundColor: c }}
-                onClick={() => {
-                  soundManager.playClick();
-                  setColor(c);
-                }}
+                onClick={() => handleColorChange(c)}
               />
             ))}
           </div>
@@ -51,28 +59,19 @@ export function ToolPanel() {
         <div className="tool-buttons">
           <button
             className={`tool-btn ${tool === 'brush' ? 'active' : ''}`}
-            onClick={() => {
-              soundManager.playClick();
-              setTool('brush');
-            }}
+            onClick={() => handleToolChange('brush')}
           >
             Brush
           </button>
           <button
             className={`tool-btn ${tool === 'eraser' ? 'active' : ''}`}
-            onClick={() => {
-              soundManager.playClick();
-              setTool('eraser');
-            }}
+            onClick={() => handleToolChange('eraser')}
           >
             Eraser
           </button>
           <button
             className={`tool-btn ${tool === 'paintbucket' ? 'active' : ''}`}
-            onClick={() => {
-              soundManager.playClick();
-              setTool('paintbucket');
-            }}
+            onClick={() => handleToolChange('paintbucket')}
           >
             Paint Bucket
           </button>
@@ -80,5 +79,5 @@ export function ToolPanel() {
       </div>
     </div>
   );
-}
+});
 

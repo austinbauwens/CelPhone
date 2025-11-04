@@ -796,7 +796,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.1s;
+  transition: transform 0.1s, opacity 0.1s; /* GPU-accelerated properties only */
   position: relative;
   overflow: hidden;
   box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
@@ -805,10 +805,12 @@
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  will-change: transform, opacity; /* GPU acceleration hint */
 }
 
 .frame-thumbnail:hover {
   border-color: var(--color-blue);
+  transform: translateZ(0); /* Force GPU acceleration */
 }
 
 .frame-thumbnail.active {
@@ -988,13 +990,14 @@
   border: 2px solid var(--color-border);
   border-radius: 0;
   cursor: pointer;
-  transition: all 0.1s;
+  transition: transform 0.1s, opacity 0.1s; /* GPU-accelerated properties only */
   box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.3);
   image-rendering: pixelated;
+  will-change: transform, opacity; /* GPU acceleration hint */
 }
 
 .color-swatch:hover {
-  transform: translate(1px, 1px);
+  transform: translate3d(1px, 1px, 0); /* GPU-accelerated transform */
   box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
 }
 
@@ -1046,6 +1049,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.75em;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.1s; /* GPU-accelerated properties only */
+  will-change: transform, opacity; /* GPU acceleration hint */
 }
 
 .tool-btn.active {
@@ -1056,7 +1062,7 @@
 }
 
 .tool-btn:active {
-  transform: translate(1px, 1px);
+  transform: translate3d(1px, 1px, 0); /* GPU-accelerated transform */
   box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.3);
 }
 

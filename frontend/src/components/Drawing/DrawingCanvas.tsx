@@ -211,76 +211,152 @@ export function DrawingCanvas({
     if (tool === 'paintbucket') {
       soundManager.playClick();
       
-      // Get canvas context for flood fill
-      const stage = stageRef.current;
-      if (!stage) return;
+      // Simply save the paint bucket fill - the useEffect will handle rendering
+      const currentLines = lines[frameNumber] || [];
+      
+      // Save as a paint bucket fill
+      const fillData: LineData = {
+        points: [pos.x, pos.y],
+        color,
+        brushSize: 0,
+        tool: 'paintbucket',
+      };
 
+      const updatedLines = [...currentLines, fillData];
+      setLines((prev) => ({
+        ...prev,
+        [frameNumber]: updatedLines,
+      }));
+
+      // Save to database
+      saveFrameData(updatedLines);
+    } else {
+      setIsDrawing(true);
+      soundManager.playDraw();
+      const newLine: LineData = {
+        points: [pos.x, pos.y],
+        color: tool === 'eraser' ? '#FFFFFF' : color,
+        brushSize: tool === 'eraser' ? brushSize * 2 : brushSize,
+        tool,
+      };
+
+      setLines((prev) => ({
+        ...prev,
+        [frameNumber]: [...(prev[frameNumber] || []), newLine],
+      }));
+    }
+  };
+
+  // Throttle mouse move to reduce lag
+  const handleMouseMove = useCallback((e: KonvaEventObject<MouseEvent>) => {
+    if (!isDrawing) return;
+
+    const stage = e.target.getStage();
+    const point = stage?.getPointerPosition();
+    if (!point) return;
+
+    setLines((prev) => {
+      const frameLines = prev[frameNumber] || [];
+      const lastLine = frameLines[frameLines.length - 1];
+      if (!lastLine) return prev;
+
+      const newLine = {
+        ...lastLine,
+        points: [...lastLine.points, point.x, point.y],
+      };
+
+      return {
+        ...prev,
+        [frameNumber]: [...frameLines.slice(0, -1), newLine],
+      };
+    });
+  }, [isDrawing, frameNumber]);
+
+  // Throttled save on mouse move (separate from state update for performance)
+  const saveTimeoutRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isDrawing) {
+      // Clear any pending save
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      
+      // Save after a short delay (debounced)
+      saveTimeoutRef.current = window.setTimeout(() => {
+        saveFrameData(lines[frameNumber] || []);
+      }, 500); // Save every 500ms while drawing
+    }
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [lines, frameNumber, isDrawing]);
+
+  const handleMouseUp = () => {
+    setIsDrawing(false);
+    // Final save
+    saveFrameData(lines[frameNumber] || []);
+  };
+
+  // Expose color and brush size setters for parent component
+  useEffect(() => {
+    // This will be connected via context or props in a real implementation
+  }, []);
+
+  const currentLines = lines[frameNumber] || [];
+
+  // Optimized rendering: Use requestAnimationFrame to batch updates and reduce lag
+  const renderTimeoutRef = useRef<number | null>(null);
+  const lastRenderLinesRef = useRef<string>(''); // Track last rendered lines to avoid unnecessary renders
+  
+  useEffect(() => {
+    if (!stageRef.current) return;
+
+    // Check if lines actually changed to avoid unnecessary renders
+    const linesKey = JSON.stringify(currentLines);
+    if (linesKey === lastRenderLinesRef.current && renderTimeoutRef.current) {
+      return; // Skip if nothing changed
+    }
+    lastRenderLinesRef.current = linesKey;
+
+    // Clear any pending render
+    if (renderTimeoutRef.current) {
+      cancelAnimationFrame(renderTimeoutRef.current);
+    }
+
+    // Batch render updates using requestAnimationFrame
+    renderTimeoutRef.current = requestAnimationFrame(() => {
+      if (!stageRef.current) return;
+
+      const stage = stageRef.current;
       const layer = stage.getLayers()[0];
       const canvas = layer.getCanvas()._canvas;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: false }); // Optimize context
       if (!ctx) return;
 
-      // Create a temporary canvas to render current state for flood fill
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = 800;
-      tempCanvas.height = 600;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
+      // Use imageSmoothingEnabled for better performance
+      ctx.imageSmoothingEnabled = false;
 
-      // Draw background
-      tempCtx.fillStyle = '#FFF5F5';
-      tempCtx.fillRect(0, 0, 800, 600);
-
-      // Draw all non-paintbucket lines first (to establish boundaries)
-      const currentLines = lines[frameNumber] || [];
-      currentLines.forEach((line) => {
-        if (line.tool === 'paintbucket') {
-          return; // Skip previous fills
-        }
-
-        tempCtx.strokeStyle = line.color;
-        tempCtx.lineWidth = line.brushSize;
-        tempCtx.lineCap = 'round';
-        tempCtx.lineJoin = 'round';
-        tempCtx.globalCompositeOperation = line.tool === 'eraser' ? 'destination-out' : 'source-over';
-
-        tempCtx.beginPath();
-        for (let i = 0; i < line.points.length - 2; i += 2) {
-          const x = line.points[i];
-          const y = line.points[i + 1];
-          if (i === 0) {
-            tempCtx.moveTo(x, y);
-          } else {
-            tempCtx.lineTo(x, y);
-          }
-        }
-        tempCtx.stroke();
-      });
-
-      // Perform flood fill on the temporary canvas
-      floodFill(tempCtx, pos.x, pos.y, color);
-
-      // Copy the filled result to the main canvas
-      ctx.clearRect(0, 0, 800, 600);
-      ctx.drawImage(tempCanvas, 0, 0);
-
-      // Redraw all lines on top of the fill
+      // Start with background
       ctx.fillStyle = '#FFF5F5';
       ctx.fillRect(0, 0, 800, 600);
-      
-      // Apply all paint bucket fills first (background fills)
-      currentLines.forEach((line) => {
-        if (line.tool === 'paintbucket' && line.points.length >= 2) {
+
+      // Separate paint bucket fills from other lines
+      const paintBucketFills = currentLines.filter((line) => line.tool === 'paintbucket');
+      const otherLines = currentLines.filter((line) => line.tool !== 'paintbucket');
+
+      // Apply all paint bucket fills first (these fill background areas)
+      paintBucketFills.forEach((line) => {
+        if (line.points.length >= 2) {
           floodFill(ctx, line.points[0], line.points[1], line.color);
         }
       });
-      
-      // Then draw lines on top
-      currentLines.forEach((line) => {
-        if (line.tool === 'paintbucket') {
-          return;
-        }
 
+      // Then draw all lines on top of the fills - batch similar operations
+      ctx.save(); // Save context state
+      otherLines.forEach((line) => {
         ctx.strokeStyle = line.color;
         ctx.lineWidth = line.brushSize;
         ctx.lineCap = 'round';
@@ -299,136 +375,17 @@ export function DrawingCanvas({
         }
         ctx.stroke();
       });
+      ctx.restore(); // Restore context state
 
-      // Apply the new fill
-      floodFill(ctx, pos.x, pos.y, color);
-
-      // Save as a paint bucket fill
-      const fillData: LineData = {
-        points: [pos.x, pos.y],
-        color,
-        brushSize: 0,
-        tool: 'paintbucket',
-      };
-
-      const updatedLines = [...currentLines, fillData];
-      setLines((prev) => ({
-        ...prev,
-        [frameNumber]: updatedLines,
-      }));
-
-      // Save to database
-      saveFrameData(updatedLines);
-      
-      // Trigger layer redraw
-      layer.draw();
-    } else {
-      setIsDrawing(true);
-      soundManager.playDraw();
-      const newLine: LineData = {
-        points: [pos.x, pos.y],
-        color: tool === 'eraser' ? '#FFFFFF' : color,
-        brushSize: tool === 'eraser' ? brushSize * 2 : brushSize,
-        tool,
-      };
-
-      setLines((prev) => ({
-        ...prev,
-        [frameNumber]: [...(prev[frameNumber] || []), newLine],
-      }));
-    }
-  };
-
-  const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
-    if (!isDrawing) return;
-
-    const stage = e.target.getStage();
-    const point = stage?.getPointerPosition();
-    if (!point) return;
-
-    setLines((prev) => {
-      const frameLines = prev[frameNumber] || [];
-      const lastLine = frameLines[frameLines.length - 1];
-      if (!lastLine) return prev;
-
-      const newLine = {
-        ...lastLine,
-        points: [...lastLine.points, point.x, point.y],
-      };
-
-      const updated = {
-        ...prev,
-        [frameNumber]: [...frameLines.slice(0, -1), newLine],
-      };
-
-      // Throttled save
-      saveFrameData(updated[frameNumber]);
-
-      return updated;
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDrawing(false);
-    // Final save
-    saveFrameData(lines[frameNumber] || []);
-  };
-
-  // Expose color and brush size setters for parent component
-  useEffect(() => {
-    // This will be connected via context or props in a real implementation
-  }, []);
-
-  const currentLines = lines[frameNumber] || [];
-
-  // Apply paint bucket fills when rendering (proper order: background, fills, then lines)
-  useEffect(() => {
-    if (!stageRef.current) return;
-
-    const stage = stageRef.current;
-    const layer = stage.getLayers()[0];
-    const canvas = layer.getCanvas()._canvas;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Start with background
-    ctx.fillStyle = '#FFF5F5';
-    ctx.fillRect(0, 0, 800, 600);
-
-    // Apply all paint bucket fills first (these fill background areas)
-    const paintBucketFills = currentLines.filter((line) => line.tool === 'paintbucket');
-    paintBucketFills.forEach((line) => {
-      if (line.points.length >= 2) {
-        floodFill(ctx, line.points[0], line.points[1], line.color);
-      }
+      // Only redraw layer if needed
+      layer.batchDraw();
     });
 
-    // Then draw all lines on top of the fills
-    currentLines.forEach((line) => {
-      if (line.tool === 'paintbucket') {
-        return; // Skip fills, already applied
+    return () => {
+      if (renderTimeoutRef.current) {
+        cancelAnimationFrame(renderTimeoutRef.current);
       }
-
-      ctx.strokeStyle = line.color;
-      ctx.lineWidth = line.brushSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.globalCompositeOperation = line.tool === 'eraser' ? 'destination-out' : 'source-over';
-
-      ctx.beginPath();
-      for (let i = 0; i < line.points.length - 2; i += 2) {
-        const x = line.points[i];
-        const y = line.points[i + 1];
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      ctx.stroke();
-    });
-
-    layer.draw();
+    };
   }, [currentLines, floodFill]);
 
   // Get cursor class based on tool
@@ -457,24 +414,29 @@ export function DrawingCanvas({
         ref={stageRef}
       >
         <Layer>
+          {/* Background is rendered in useEffect, but we need a placeholder for Konva */}
           <Rect width={800} height={600} fill="#FFF5F5" />
-          {currentLines.map((line, i) => {
-            if (line.tool === 'paintbucket') {
-              return null;
+          {/* Lines are rendered via direct canvas manipulation in useEffect for better performance */}
+          {/* Only render lines in Konva for interactivity during drawing */}
+          {isDrawing && currentLines.length > 0 && (() => {
+            const lastLine = currentLines[currentLines.length - 1];
+            if (lastLine && lastLine.tool !== 'paintbucket' && lastLine.points.length >= 2) {
+              return (
+                <Line
+                  key={currentLines.length - 1}
+                  points={lastLine.points}
+                  stroke={lastLine.color}
+                  strokeWidth={lastLine.brushSize}
+                  tension={0.5}
+                  lineCap="round"
+                  lineJoin="round"
+                  globalCompositeOperation={lastLine.tool === 'eraser' ? 'destination-out' : 'source-over'}
+                  listening={false}
+                />
+              );
             }
-            return (
-              <Line
-                key={i}
-                points={line.points}
-                stroke={line.color}
-                strokeWidth={line.brushSize}
-                tension={0.5}
-                lineCap="round"
-                lineJoin="round"
-                globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'}
-              />
-            );
-          })}
+            return null;
+          })()}
         </Layer>
       </Stage>
     </div>

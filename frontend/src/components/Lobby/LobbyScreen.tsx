@@ -57,6 +57,7 @@ export function LobbyScreen({ gameId, playerId, onGameJoined, onGameStatusChange
     }
 
     // Always start polling (works even without realtime)
+    // Reduced frequency - 3 seconds is sufficient for status updates
     pollInterval = setInterval(async () => {
       try {
         const { data, error } = await supabase
@@ -81,7 +82,7 @@ export function LobbyScreen({ gameId, playerId, onGameJoined, onGameStatusChange
       } catch (err) {
         console.error('Error polling game status:', err);
       }
-    }, 1000); // Poll every second
+    }, 3000); // Poll every 3 seconds to reduce database load
 
     // Try realtime subscription (optional optimization)
     try {

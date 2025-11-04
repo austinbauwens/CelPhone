@@ -61,7 +61,7 @@ export function AnimationGallery({ gameId, frames }: AnimationGalleryProps) {
 
           return (
             <div key={player.id} className="gallery-item">
-              <AnimationViewer frames={playerFramesList} playerName={player.nickname} />
+              <AnimationViewer frames={playerFramesList} playerName={player.nickname} showDownload={true} />
             </div>
           );
         })}

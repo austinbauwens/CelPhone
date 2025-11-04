@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Player } from '../../types';
 
@@ -7,20 +7,30 @@ interface PlayerListProps {
   playerId: string | null;
 }
 
-export function PlayerList({ gameId, playerId }: PlayerListProps) {
+export const PlayerList = memo(function PlayerList({ gameId, playerId }: PlayerListProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPlayers = useCallback(async () => {
     try {
+      // Only select needed fields for better performance
       const { data, error } = await supabase
         .from('players')
-        .select('*')
+        .select('id, nickname, is_host, turn_order')
         .eq('game_id', gameId)
         .order('turn_order', { ascending: true });
 
       if (error) throw error;
-      setPlayers(data || []);
+      
+      // Only update if data actually changed to prevent unnecessary re-renders
+      setPlayers(prevPlayers => {
+        const newPlayers = data || [];
+        if (prevPlayers.length === newPlayers.length && 
+            JSON.stringify(prevPlayers) === JSON.stringify(newPlayers)) {
+          return prevPlayers;
+        }
+        return newPlayers;
+      });
     } catch (err) {
       console.error('Error fetching players:', err);
     } finally {
@@ -39,10 +49,10 @@ export function PlayerList({ gameId, playerId }: PlayerListProps) {
     let pollInterval: ReturnType<typeof setInterval> | null = null;
 
     // Always set up polling as fallback (works even without realtime)
+    // Reduced frequency - 3 seconds is sufficient
     pollInterval = setInterval(() => {
-      console.log('Polling for player updates...');
       fetchPlayers();
-    }, 1000); // Poll every second
+    }, 3000); // Poll every 3 seconds to reduce database load
 
     // Try realtime subscription
     try {
@@ -70,10 +80,10 @@ export function PlayerList({ gameId, playerId }: PlayerListProps) {
             // But reduce polling frequency if realtime works
             if (pollInterval) {
               clearInterval(pollInterval);
-              // Poll every 2 seconds as backup if realtime is working
+              // Poll every 5 seconds as backup if realtime is working
               pollInterval = setInterval(() => {
                 fetchPlayers();
-              }, 2000);
+              }, 5000);
             }
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.warn('Realtime subscription failed, using polling only');
@@ -81,7 +91,7 @@ export function PlayerList({ gameId, playerId }: PlayerListProps) {
             if (!pollInterval) {
               pollInterval = setInterval(() => {
                 fetchPlayers();
-              }, 1000);
+              }, 3000);
             }
           }
         });
@@ -124,5 +134,5 @@ export function PlayerList({ gameId, playerId }: PlayerListProps) {
       <button className="btn btn-secondary btn-small">LOAD MORE</button>
     </div>
   );
-}
+});
 

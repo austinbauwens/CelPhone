@@ -6,9 +6,10 @@ import type { Frame } from '../../types';
 interface AnimationViewerProps {
   frames: Frame[];
   playerName?: string;
+  showDownload?: boolean; // Only show download button on end screen
 }
 
-export function AnimationViewer({ frames, playerName }: AnimationViewerProps) {
+export function AnimationViewer({ frames, playerName, showDownload = false }: AnimationViewerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -223,7 +224,9 @@ export function AnimationViewer({ frames, playerName }: AnimationViewerProps) {
           ))}
         </div>
       </div>
-      <GIFGenerator frames={frames} canvasRef={canvasRef as React.RefObject<HTMLCanvasElement>} />
+      {showDownload && (
+        <GIFGenerator frames={frames} canvasRef={canvasRef as React.RefObject<HTMLCanvasElement>} />
+      )}
     </div>
   );
 }

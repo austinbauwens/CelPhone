@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useCallback } from 'react';
 import { soundManager } from '../../lib/sounds';
 
 interface PromptInputProps {
@@ -7,10 +7,10 @@ interface PromptInputProps {
   isSubmitted?: boolean;
 }
 
-export function PromptInput({ onPromptSubmit, currentPrompt, isSubmitted = false }: PromptInputProps) {
+export const PromptInput = memo(function PromptInput({ onPromptSubmit, currentPrompt, isSubmitted = false }: PromptInputProps) {
   const [prompt, setPrompt] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     // Prevent submission if already submitted or prompt is empty
     if (isSubmitted || !prompt.trim()) {
@@ -19,14 +19,14 @@ export function PromptInput({ onPromptSubmit, currentPrompt, isSubmitted = false
     soundManager.playSubmit();
     onPromptSubmit(prompt.trim());
     setPrompt('');
-  };
+  }, [isSubmitted, prompt, onPromptSubmit]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     // Play typing sound for printable characters (not special keys)
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       soundManager.playTyping();
     }
-  };
+  }, []);
 
   // If already submitted, don't show the form
   if (isSubmitted) {
@@ -66,5 +66,5 @@ export function PromptInput({ onPromptSubmit, currentPrompt, isSubmitted = false
       </form>
     </div>
   );
-}
+});
 

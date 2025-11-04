@@ -186,7 +186,7 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
   ): Promise<{ allSubmitted: boolean; playerCount: number; submittedCount: number; missingPlayers: string[] }> => {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        // Get all players with retry
+        // Get all players with retry - only select needed fields for performance
         const { data: allPlayers, error: playersError } = await supabase
           .from('players')
           .select('id, nickname')
@@ -210,12 +210,12 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
 
         const allPlayerIds = new Set(allPlayers.map(p => p.id));
 
-        // Check submissions based on phase
+        // Check submissions based on phase - only select player_id for performance
         let submissions: any[] = [];
         if (phase === 'drawing') {
           const { data: submittedDrawings, error: submissionsError } = await supabase
             .from('player_submissions')
-            .select('player_id')
+            .select('player_id') // Only select what we need
             .eq('game_id', gameId)
             .eq('round_number', roundNumber)
             .eq('phase', 'drawing');
@@ -230,10 +230,10 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
           }
           submissions = submittedDrawings || [];
         } else {
-          // Prompt phase
+          // Prompt phase - only select player_id for performance
           const { data: submittedPrompts, error: promptsError } = await supabase
             .from('prompts')
-            .select('player_id')
+            .select('player_id') // Only select what we need
             .eq('game_id', gameId)
             .eq('round_number', roundNumber);
 

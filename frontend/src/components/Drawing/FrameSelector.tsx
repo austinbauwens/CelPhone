@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { soundManager } from '../../lib/sounds';
 import type { Frame } from '../../types';
@@ -13,7 +13,7 @@ interface FrameSelectorProps {
   onFrameCompleteToggle: (frameNum: number, isComplete: boolean) => void;
 }
 
-export function FrameSelector({
+export const FrameSelector = memo(function FrameSelector({
   frames,
   currentFrame,
   onFrameSelect,
@@ -83,31 +83,8 @@ export function FrameSelector({
     };
   }, [roundId, playerId]);
 
-  // Draw thumbnails
-  useEffect(() => {
-    Object.keys(frameData).forEach((frameNumStr) => {
-      const frameNum = parseInt(frameNumStr);
-      const canvas = canvasRefs.current[frameNum];
-      const frame = frameData[frameNum];
-      if (!canvas || !frame) return;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Clear canvas with light background to show drawings
-      ctx.fillStyle = '#FFF5F5';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      try {
-        const lineData = JSON.parse(frame.image_data);
-        drawLines(ctx, lineData, canvas.width, canvas.height);
-      } catch (err) {
-        console.error('Error drawing thumbnail:', err);
-      }
-    });
-  }, [frameData]);
-
-  const drawLines = (
+  // Memoized drawLines function for better performance
+  const drawLines = useCallback((
     ctx: CanvasRenderingContext2D,
     lines: any[],
     canvasWidth: number,
@@ -141,7 +118,42 @@ export function FrameSelector({
       }
       ctx.stroke();
     });
-  };
+  }, []);
+
+  // Draw thumbnails - optimized with requestAnimationFrame
+  useEffect(() => {
+    const frameKeys = Object.keys(frameData);
+    if (frameKeys.length === 0) return;
+
+    // Use requestAnimationFrame to batch thumbnail renders
+    const renderFrame = requestAnimationFrame(() => {
+      frameKeys.forEach((frameNumStr) => {
+        const frameNum = parseInt(frameNumStr);
+        const canvas = canvasRefs.current[frameNum];
+        const frame = frameData[frameNum];
+        if (!canvas || !frame) return;
+
+        const ctx = canvas.getContext('2d', { willReadFrequently: false });
+        if (!ctx) return;
+
+        // Optimize context
+        ctx.imageSmoothingEnabled = false;
+
+        // Clear canvas with light background to show drawings
+        ctx.fillStyle = '#FFF5F5';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        try {
+          const lineData = JSON.parse(frame.image_data);
+          drawLines(ctx, lineData, canvas.width, canvas.height);
+        } catch (err) {
+          console.error('Error drawing thumbnail:', err);
+        }
+      });
+    });
+
+    return () => cancelAnimationFrame(renderFrame);
+  }, [frameData, drawLines]);
 
   return (
     <div className="frame-selector">
@@ -150,11 +162,12 @@ export function FrameSelector({
         {Array.from({ length: frames }, (_, i) => {
           const frame = frameData[i];
           const isComplete = completedFrames.has(i);
+          const isActive = currentFrame === i;
 
           return (
-            <div key={i} className={`frame-thumbnail-wrapper ${currentFrame === i ? 'active' : ''} ${isComplete ? 'complete' : ''}`}>
+            <div key={i} className={`frame-thumbnail-wrapper ${isActive ? 'active' : ''} ${isComplete ? 'complete' : ''}`}>
               <button
-                className={`frame-thumbnail ${currentFrame === i ? 'active' : ''} ${isComplete ? 'complete' : ''}`}
+                className={`frame-thumbnail ${isActive ? 'active' : ''} ${isComplete ? 'complete' : ''}`}
                 onClick={() => {
                   soundManager.playClick();
                   onFrameSelect(i);
@@ -192,5 +205,5 @@ export function FrameSelector({
       </div>
     </div>
   );
-}
+});
 
