@@ -1,10 +1,6 @@
 import { useEffect } from 'react';
 
-interface PixelStarsProps {
-  starCount?: number;
-}
-
-export function PixelStars({ starCount = 100 }: PixelStarsProps) {
+export function PixelStars() {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       // Calculate parallax offset based on mouse position
