@@ -13,18 +13,18 @@ export const PlayerList = memo(function PlayerList({ gameId, playerId }: PlayerL
 
   const fetchPlayers = useCallback(async () => {
     try {
-      // Only select needed fields for better performance
+      // Select all fields needed for Player type (required for type safety)
       const { data, error } = await supabase
         .from('players')
-        .select('id, nickname, is_host, turn_order')
+        .select('id, nickname, is_host, turn_order, game_id, user_id, created_at')
         .eq('game_id', gameId)
         .order('turn_order', { ascending: true });
 
       if (error) throw error;
       
       // Only update if data actually changed to prevent unnecessary re-renders
+      const newPlayers = (data || []) as Player[];
       setPlayers(prevPlayers => {
-        const newPlayers = data || [];
         if (prevPlayers.length === newPlayers.length && 
             JSON.stringify(prevPlayers) === JSON.stringify(newPlayers)) {
           return prevPlayers;

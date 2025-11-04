@@ -86,10 +86,12 @@ class SoundManager {
       // Cache immediately (before load completes) to avoid duplicate requests
       this.audioCache.set(fileName, audio);
 
-      // Preload asynchronously (don't await)
-      audio.load().catch(() => {
+      // Preload (audio.load() returns void, not a Promise)
+      try {
+        audio.load();
+      } catch {
         // Silently handle load errors - will fallback to programmatic tone
-      });
+      }
 
       return audio;
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { soundManager } from '../../lib/sounds';
 import type { Frame } from '../../types';
