@@ -1,7 +1,32 @@
-// 8-bit sound effects using Web Audio API
+// 8-bit sound effects using audio files with fallback to Web Audio API
+
+type SoundEffect = 
+  | 'click'
+  | 'hover'
+  | 'draw'
+  | 'success'
+  | 'error'
+  | 'submit'
+  | 'transition'
+  | 'warning'
+  | 'tick'
+  | 'frameComplete'
+  | 'playerJoin'
+  | 'gameStart'
+  | 'timerLow'
+  | 'drawingComplete'
+  | 'download'
+  | 'powerup'
+  | 'pickup'
+  | 'jump'
+  | 'coin'
+  | 'menu'
+  | 'typing';
 
 class SoundManager {
   private audioContext: AudioContext | null = null;
+  private audioCache: Map<string, HTMLAudioElement> = new Map();
+  private soundEnabled: boolean = true;
 
   constructor() {
     // Initialize audio context on first user interaction
@@ -16,6 +41,127 @@ class SoundManager {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
   };
+
+  // Sound file mappings - maps our sound effects to OpenGameArt filenames
+  private soundFiles: Record<SoundEffect, string> = {
+    click: 'ui-click.wav',
+    hover: 'ui-hover.wav',
+    draw: 'brush.wav',
+    success: 'powerup.wav',
+    error: 'error.wav',
+    submit: 'coin.wav',
+    transition: 'transition.wav',
+    warning: 'warning.wav',
+    tick: 'tick.wav',
+    frameComplete: 'pickup.wav',
+    playerJoin: 'jump.wav',
+    gameStart: 'powerup.wav',
+    timerLow: 'warning.wav',
+    drawingComplete: 'success.wav',
+    download: 'coin.wav',
+    powerup: 'powerup.wav',
+    pickup: 'pickup.wav',
+    jump: 'jump.wav',
+    coin: 'coin.wav',
+    menu: 'ui-click.wav',
+    typing: 'tick.wav', // Use tick sound for typing
+  };
+
+  // Load and cache an audio file
+  private async loadAudio(soundName: SoundEffect): Promise<HTMLAudioElement | null> {
+    const fileName = this.soundFiles[soundName];
+    if (!fileName) return null;
+
+    // Check cache first
+    if (this.audioCache.has(fileName)) {
+      return this.audioCache.get(fileName)!;
+    }
+
+    try {
+      const audio = new Audio(`/sounds/${fileName}`);
+      audio.volume = 0.15; // Quiet volume (15%)
+      
+      // Preload
+      audio.load();
+      
+      // Cache it
+      this.audioCache.set(fileName, audio);
+      
+      return audio;
+    } catch (error) {
+      console.warn(`Failed to load sound: ${fileName}`, error);
+      return null;
+    }
+  }
+
+  // Play a sound file with fallback to programmatic tone
+  // Applies low-pass filter to soften sharp 8-bit sounds
+  private async playSound(soundName: SoundEffect, fallbackTone?: () => void) {
+    if (!this.soundEnabled) return;
+
+    // Initialize audio context if needed
+    if (!this.audioContext) {
+      this.initAudioContext();
+    }
+
+    const audio = await this.loadAudio(soundName);
+    if (audio && this.audioContext) {
+      try {
+        // Fetch and decode the audio file
+        const response = await fetch(audio.src);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+        // Create a new audio source for this playback
+        const source = this.audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+
+        // Create low-pass filter to soften sharp sounds
+        const filter = this.audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 2500; // Cut frequencies above 2.5kHz for softer sound
+        filter.Q.value = 1;
+
+        // Create gain node for volume control
+        const gainNode = this.audioContext.createGain();
+        gainNode.gain.value = 0.15; // Quiet volume (15%)
+
+        // Connect: source -> filter -> gain -> destination
+        source.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+
+        // Play the filtered sound
+        source.start(0);
+        return;
+      } catch (error) {
+        console.warn(`Failed to play filtered sound: ${soundName}`, error);
+        // Fall through to simple playback fallback
+      }
+    }
+
+    // Fallback: simple playback without filter
+    if (audio) {
+      try {
+        const audioElement = new Audio(audio.src);
+        audioElement.volume = 0.15;
+        audioElement.onerror = () => {
+          if (fallbackTone) fallbackTone();
+        };
+        await audioElement.play().catch(() => {
+          if (fallbackTone) fallbackTone();
+        });
+        return;
+      } catch (error) {
+        console.warn(`Failed to play sound: ${soundName}`, error);
+      }
+    }
+
+    // Final fallback to programmatic tone
+    if (fallbackTone) {
+      fallbackTone();
+    }
+  }
 
   private playTone(frequency: number, duration: number, type: OscillatorType = 'square', volume: number = 0.1) {
     if (!this.audioContext) {
@@ -41,128 +187,197 @@ class SoundManager {
 
   // Button click sound
   playClick() {
-    this.playTone(800, 0.1, 'square', 0.15);
+    this.playSound('click', () => this.playTone(800, 0.1, 'square', 0.15));
   }
 
   // Button hover sound
   playHover() {
-    this.playTone(600, 0.05, 'square', 0.08);
+    this.playSound('hover', () => this.playTone(600, 0.05, 'square', 0.08));
   }
 
   // Drawing sound (brush stroke)
   playDraw() {
-    this.playTone(400, 0.05, 'sawtooth', 0.1);
+    this.playSound('draw', () => this.playTone(400, 0.05, 'sawtooth', 0.1));
   }
 
   // Success/completion sound
   playSuccess() {
-    // Two-tone chime
-    this.playTone(600, 0.1, 'square', 0.15);
-    setTimeout(() => {
-      this.playTone(800, 0.15, 'square', 0.15);
-    }, 100);
+    this.playSound('success', () => {
+      this.playTone(600, 0.1, 'square', 0.15);
+      setTimeout(() => {
+        this.playTone(800, 0.15, 'square', 0.15);
+      }, 100);
+    });
   }
 
   // Error sound
   playError() {
-    this.playTone(200, 0.2, 'sawtooth', 0.2);
+    this.playSound('error', () => this.playTone(200, 0.2, 'sawtooth', 0.2));
   }
 
   // Submit sound
   playSubmit() {
-    // Ascending notes
-    this.playTone(400, 0.1, 'square', 0.15);
-    setTimeout(() => {
-      this.playTone(600, 0.1, 'square', 0.15);
-    }, 100);
-    setTimeout(() => {
-      this.playTone(800, 0.15, 'square', 0.15);
-    }, 200);
+    this.playSound('submit', () => {
+      this.playTone(400, 0.1, 'square', 0.15);
+      setTimeout(() => {
+        this.playTone(600, 0.1, 'square', 0.15);
+      }, 100);
+      setTimeout(() => {
+        this.playTone(800, 0.15, 'square', 0.15);
+      }, 200);
+    });
   }
 
   // Round transition sound
   playTransition() {
-    // Descending notes
-    this.playTone(800, 0.1, 'square', 0.15);
-    setTimeout(() => {
-      this.playTone(600, 0.1, 'square', 0.15);
-    }, 100);
-    setTimeout(() => {
-      this.playTone(400, 0.15, 'square', 0.15);
-    }, 200);
+    this.playSound('transition', () => {
+      this.playTone(800, 0.1, 'square', 0.15);
+      setTimeout(() => {
+        this.playTone(600, 0.1, 'square', 0.15);
+      }, 100);
+      setTimeout(() => {
+        this.playTone(400, 0.15, 'square', 0.15);
+      }, 200);
+    });
   }
 
   // Timer warning sound
   playWarning() {
-    this.playTone(300, 0.2, 'square', 0.2);
-    setTimeout(() => {
+    this.playSound('warning', () => {
       this.playTone(300, 0.2, 'square', 0.2);
-    }, 200);
+      setTimeout(() => {
+        this.playTone(300, 0.2, 'square', 0.2);
+      }, 200);
+    });
   }
 
   // Timer tick sound (for countdown)
   playTick() {
-    this.playTone(500, 0.05, 'square', 0.08);
+    this.playSound('tick', () => this.playTone(500, 0.05, 'square', 0.08));
   }
 
   // Frame completion sound
   playFrameComplete() {
-    this.playTone(700, 0.1, 'square', 0.12);
+    this.playSound('frameComplete', () => this.playTone(700, 0.1, 'square', 0.12));
   }
 
   // Player join sound
   playPlayerJoin() {
-    // Upward arpeggio
-    this.playTone(400, 0.08, 'square', 0.12);
-    setTimeout(() => {
-      this.playTone(500, 0.08, 'square', 0.12);
-    }, 80);
-    setTimeout(() => {
-      this.playTone(600, 0.08, 'square', 0.12);
-    }, 160);
+    this.playSound('playerJoin', () => {
+      this.playTone(400, 0.08, 'square', 0.12);
+      setTimeout(() => {
+        this.playTone(500, 0.08, 'square', 0.12);
+      }, 80);
+      setTimeout(() => {
+        this.playTone(600, 0.08, 'square', 0.12);
+      }, 160);
+    });
   }
 
   // Game start sound
   playGameStart() {
-    // Fanfare
-    this.playTone(600, 0.1, 'square', 0.15);
-    setTimeout(() => {
-      this.playTone(700, 0.1, 'square', 0.15);
-    }, 100);
-    setTimeout(() => {
-      this.playTone(800, 0.1, 'square', 0.15);
-    }, 200);
-    setTimeout(() => {
-      this.playTone(1000, 0.2, 'square', 0.15);
-    }, 300);
+    this.playSound('gameStart', () => {
+      this.playTone(600, 0.1, 'square', 0.15);
+      setTimeout(() => {
+        this.playTone(700, 0.1, 'square', 0.15);
+      }, 100);
+      setTimeout(() => {
+        this.playTone(800, 0.1, 'square', 0.15);
+      }, 200);
+      setTimeout(() => {
+        this.playTone(1000, 0.2, 'square', 0.15);
+      }, 300);
+    });
   }
 
   // Timer low sound (when under 30 seconds)
   playTimerLow() {
-    this.playTone(250, 0.15, 'sawtooth', 0.15);
+    this.playSound('timerLow', () => this.playTone(250, 0.15, 'sawtooth', 0.15));
   }
 
   // Drawing complete sound
   playDrawingComplete() {
-    // Three-tone completion
-    this.playTone(500, 0.1, 'square', 0.15);
-    setTimeout(() => {
-      this.playTone(600, 0.1, 'square', 0.15);
-    }, 100);
-    setTimeout(() => {
-      this.playTone(700, 0.15, 'square', 0.15);
-    }, 200);
+    this.playSound('drawingComplete', () => {
+      this.playTone(500, 0.1, 'square', 0.15);
+      setTimeout(() => {
+        this.playTone(600, 0.1, 'square', 0.15);
+      }, 100);
+      setTimeout(() => {
+        this.playTone(700, 0.15, 'square', 0.15);
+      }, 200);
+    });
   }
 
   // Download/GIF generation sound
   playDownload() {
-    // Success chime
-    this.playTone(600, 0.1, 'square', 0.15);
-    setTimeout(() => {
-      this.playTone(800, 0.15, 'square', 0.15);
-    }, 100);
+    this.playSound('download', () => {
+      this.playTone(600, 0.1, 'square', 0.15);
+      setTimeout(() => {
+        this.playTone(800, 0.15, 'square', 0.15);
+      }, 100);
+    });
+  }
+
+  // Typing sound (very subtle)
+  private lastTypingTime = 0;
+  private typingThrottle = 50; // Minimum ms between typing sounds
+  
+  playTyping() {
+    // Throttle typing sounds to avoid too many overlapping sounds
+    const now = Date.now();
+    if (now - this.lastTypingTime < this.typingThrottle) {
+      return;
+    }
+    this.lastTypingTime = now;
+
+    if (!this.soundEnabled) return;
+
+    // Initialize audio context if needed
+    if (!this.audioContext) {
+      this.initAudioContext();
+    }
+
+    const audio = this.loadAudio('typing');
+    audio.then((audioElement) => {
+      if (audioElement && this.audioContext) {
+        try {
+          // Fetch and decode the audio file with very low volume for typing
+          fetch(audioElement.src)
+            .then(response => response.arrayBuffer())
+            .then(arrayBuffer => this.audioContext!.decodeAudioData(arrayBuffer))
+            .then(audioBuffer => {
+              const source = this.audioContext!.createBufferSource();
+              source.buffer = audioBuffer;
+
+              // Create low-pass filter to soften
+              const filter = this.audioContext!.createBiquadFilter();
+              filter.type = 'lowpass';
+              filter.frequency.value = 2500;
+              filter.Q.value = 1;
+
+              // Very quiet gain for typing (5% volume)
+              const gainNode = this.audioContext!.createGain();
+              gainNode.gain.value = 0.05;
+
+              source.connect(filter);
+              filter.connect(gainNode);
+              gainNode.connect(this.audioContext!.destination);
+              source.start(0);
+            })
+            .catch(() => {
+              // Fallback to very quiet programmatic tone
+              this.playTone(800, 0.03, 'square', 0.03);
+            });
+        } catch (error) {
+          // Fallback to very quiet programmatic tone
+          this.playTone(800, 0.03, 'square', 0.03);
+        }
+      } else {
+        // Fallback to very quiet programmatic tone
+        this.playTone(800, 0.03, 'square', 0.03);
+      }
+    });
   }
 }
 
 export const soundManager = new SoundManager();
-

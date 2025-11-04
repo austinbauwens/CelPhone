@@ -21,6 +21,13 @@ export function PromptInput({ onPromptSubmit, currentPrompt, isSubmitted = false
     setPrompt('');
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Play typing sound for printable characters (not special keys)
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      soundManager.playTyping();
+    }
+  };
+
   // If already submitted, don't show the form
   if (isSubmitted) {
     return null;
@@ -41,6 +48,7 @@ export function PromptInput({ onPromptSubmit, currentPrompt, isSubmitted = false
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Enter your prompt..."
             maxLength={100}
             required

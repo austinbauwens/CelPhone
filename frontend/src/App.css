@@ -12,8 +12,8 @@
   width: 100%;
 }
 
-/* Shimmer Grid Background - 8-bit pixelated */
-.shimmer-grid {
+/* Pixel Stars Background - 8-bit pixelated with parallax */
+.pixel-stars {
   position: fixed;
   top: 0;
   left: 0;
@@ -21,33 +21,141 @@
   height: 100%;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.08;
-  background-image: 
-    linear-gradient(to right, var(--color-border) 2px, transparent 2px),
-    linear-gradient(to bottom, var(--color-border) 2px, transparent 2px);
-  background-size: 50px 50px;
   background-color: var(--color-bg-primary);
-  background-position: 0 0;
+  overflow: hidden;
+}
+
+.stars-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
 }
 
-/* Add subtle shimmer effect that highlights grid cell under cursor - 8-bit pixelated */
-.shimmer-grid::before {
-  content: '';
-  position: absolute;
-  top: var(--mouse-y, 0);
-  left: var(--mouse-x, 0);
-  width: var(--grid-size, 50px);
-  height: var(--grid-size, 50px);
-  background: rgba(255, 255, 255, 0.05);
-  pointer-events: none;
-  transition: top 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              left 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  will-change: top, left;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  image-rendering: pixelated;
+/* Layer 1 - Far stars (small, slow, subtle) */
+.stars-layer-1 {
+  opacity: 0.15;
+  transform: translate(calc(var(--parallax-x-1, 0px) * 0.1), calc(var(--parallax-y-1, 0px) * 0.1));
+  background-image: 
+    radial-gradient(2px 2px at 8% 12%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 15% 25%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 22% 18%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 28% 35%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 35% 8%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 42% 45%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 48% 22%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 55% 38%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 62% 15%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 68% 48%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 75% 32%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 82% 5%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 88% 42%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 92% 18%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 5% 55%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 12% 68%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 18% 78%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 25% 85%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 32% 62%, var(--color-text), transparent),
+    radial-gradient(1px 1px at 38% 72%, var(--color-text), transparent);
+  background-size: 200% 200%;
+  background-position: 0 0;
+  animation: twinkle-slow 8s ease-in-out infinite, drift-slow 20s linear infinite;
+}
+
+/* Layer 2 - Medium stars (medium size, medium speed) */
+.stars-layer-2 {
+  opacity: 0.25;
+  transform: translate(calc(var(--parallax-x-2, 0px) * 0.3), calc(var(--parallax-y-2, 0px) * 0.3));
+  background-image: 
+    radial-gradient(3px 3px at 10% 20%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 18% 45%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 25% 10%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 32% 55%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 40% 30%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 48% 65%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 55% 15%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 62% 75%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 70% 40%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 78% 85%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 85% 25%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 92% 50%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 5% 70%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 15% 80%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 35% 90%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 50% 5%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 65% 60%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 80% 95%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 95% 35%, var(--color-text), transparent),
+    radial-gradient(2px 2px at 22% 28%, var(--color-text), transparent);
+  background-size: 150% 150%;
+  background-position: 0 0;
+  animation: twinkle-medium 6s ease-in-out infinite, drift-medium 15s linear infinite;
+}
+
+/* Layer 3 - Close stars (large, fast, more visible) */
+.stars-layer-3 {
+  opacity: 0.35;
+  transform: translate(calc(var(--parallax-x-3, 0px) * 0.5), calc(var(--parallax-y-3, 0px) * 0.5));
+  background-image: 
+    radial-gradient(4px 4px at 12% 15%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 20% 35%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 28% 8%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 35% 50%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 42% 22%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 50% 65%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 58% 12%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 65% 75%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 72% 38%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 80% 85%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 88% 18%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 95% 55%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 5% 70%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 15% 45%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 25% 90%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 40% 5%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 60% 80%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 75% 28%, var(--color-text), transparent),
+    radial-gradient(4px 4px at 92% 62%, var(--color-text), transparent),
+    radial-gradient(3px 3px at 18% 58%, var(--color-text), transparent);
+  background-size: 120% 120%;
+  background-position: 0 0;
+  animation: twinkle-fast 4s ease-in-out infinite, drift-fast 10s linear infinite;
+}
+
+/* Twinkling animations */
+@keyframes twinkle-slow {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes twinkle-medium {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes twinkle-fast {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.5; }
+}
+
+/* Drifting animations for parallax movement */
+@keyframes drift-slow {
+  0% { background-position: 0 0; }
+  100% { background-position: 100% 100%; }
+}
+
+@keyframes drift-medium {
+  0% { background-position: 0 0; }
+  100% { background-position: -100% -100%; }
+}
+
+@keyframes drift-fast {
+  0% { background-position: 0 0; }
+  100% { background-position: 50% 50%; }
 }
 
 /* Lobby Screen */
@@ -90,6 +198,76 @@
   word-wrap: break-word;
   overflow-wrap: break-word;
   max-width: 100%;
+  animation: arcade-flicker 0.8s infinite, arcade-shimmer 3s ease-in-out infinite;
+  position: relative;
+}
+
+/* Arcade flicker effect - balanced brightness variation */
+@keyframes arcade-flicker {
+  0%, 100% { 
+    opacity: 1;
+    filter: brightness(1);
+  }
+  15% {
+    opacity: 0.97;
+    filter: brightness(0.96);
+  }
+  30% {
+    opacity: 1;
+    filter: brightness(1.08);
+  }
+  45% {
+    opacity: 0.99;
+    filter: brightness(1.02);
+  }
+  60% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  75% {
+    opacity: 0.98;
+    filter: brightness(0.98);
+  }
+  90% {
+    opacity: 1;
+    filter: brightness(1.05);
+  }
+}
+
+/* Shimmer effect - balanced glow and color variation */
+@keyframes arcade-shimmer {
+  0%, 100% {
+    text-shadow: 
+      4px 4px 0px rgba(0, 0, 0, 0.5), 
+      2px 2px 0px rgba(0, 122, 255, 0.4),
+      0 0 15px rgba(0, 122, 255, 0.4),
+      0 0 30px rgba(0, 122, 255, 0.25);
+    color: var(--color-blue);
+  }
+  25% {
+    text-shadow: 
+      4px 4px 0px rgba(0, 0, 0, 0.5), 
+      2px 2px 0px rgba(0, 150, 255, 0.5),
+      0 0 20px rgba(0, 150, 255, 0.5),
+      0 0 35px rgba(0, 150, 255, 0.3);
+    color: #0096ff;
+  }
+  50% {
+    text-shadow: 
+      4px 4px 0px rgba(0, 0, 0, 0.5), 
+      2px 2px 0px rgba(0, 122, 255, 0.4),
+      0 0 15px rgba(0, 122, 255, 0.4),
+      0 0 30px rgba(0, 122, 255, 0.25);
+    color: var(--color-blue);
+  }
+  75% {
+    text-shadow: 
+      4px 4px 0px rgba(0, 0, 0, 0.5), 
+      2px 2px 0px rgba(0, 100, 255, 0.45),
+      0 0 18px rgba(0, 100, 255, 0.45),
+      0 0 32px rgba(0, 100, 255, 0.28);
+    color: #0064ff;
+  }
 }
 
 .game-subtitle {

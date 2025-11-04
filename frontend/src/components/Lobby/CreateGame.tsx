@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { generateRoomCode } from '../../lib/utils';
+import { soundManager } from '../../lib/sounds';
 import type { FramesPerRound } from '../../types';
 
 interface CreateGameProps {
@@ -66,6 +67,13 @@ export function CreateGame({ onGameCreated, onClose }: CreateGameProps) {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Play typing sound for printable characters (not special keys)
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      soundManager.playTyping();
+    }
+  };
+
   return (
     <div 
       className="create-game-modal"
@@ -83,6 +91,7 @@ export function CreateGame({ onGameCreated, onClose }: CreateGameProps) {
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Enter your nickname"
             maxLength={20}
           />

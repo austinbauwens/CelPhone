@@ -3,7 +3,7 @@ import { LobbyScreen } from './components/Lobby/LobbyScreen';
 import { DrawingScreen } from './components/Drawing/DrawingScreen';
 import { AnimationScreen } from './components/Animation/AnimationScreen';
 import { PromptScreen } from './components/Drawing/PromptScreen';
-import { ShimmerGrid } from './components/ShimmerGrid';
+import { PixelStars } from './components/PixelStars';
 import './App.css';
 
 function App() {
@@ -41,7 +41,7 @@ function App() {
 
   return (
     <div className="app">
-      <ShimmerGrid />
+      <PixelStars />
       <div className="app-content">
         {screen === 'lobby' && (
           <LobbyScreen

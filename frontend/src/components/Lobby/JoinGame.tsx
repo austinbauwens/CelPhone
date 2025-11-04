@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { soundManager } from '../../lib/sounds';
 
 interface JoinGameProps {
   onGameJoined: (gameId: string, playerId: string) => void;
@@ -74,6 +75,13 @@ export function JoinGame({ onGameJoined, onClose }: JoinGameProps) {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Play typing sound for printable characters (not special keys)
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      soundManager.playTyping();
+    }
+  };
+
   return (
     <div 
       className="join-game-modal"
@@ -91,6 +99,7 @@ export function JoinGame({ onGameJoined, onClose }: JoinGameProps) {
             type="text"
             value={roomCode}
             onChange={(e) => setRoomCode(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Enter room code (e.g. sunny creek inn)"
           />
         </div>
@@ -101,6 +110,7 @@ export function JoinGame({ onGameJoined, onClose }: JoinGameProps) {
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Enter your nickname"
             maxLength={20}
           />
