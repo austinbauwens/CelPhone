@@ -3,9 +3,10 @@ import { supabase } from '../../lib/supabase';
 
 interface JoinGameProps {
   onGameJoined: (gameId: string, playerId: string) => void;
+  onClose?: () => void;
 }
 
-export function JoinGame({ onGameJoined }: JoinGameProps) {
+export function JoinGame({ onGameJoined, onClose }: JoinGameProps) {
   // Check URL for room code on mount
   const urlParams = new URLSearchParams(window.location.search);
   const urlRoomCode = urlParams.get('room');
@@ -74,8 +75,14 @@ export function JoinGame({ onGameJoined }: JoinGameProps) {
   };
 
   return (
-    <div className="join-game-modal">
-      <div className="modal-content">
+    <div 
+      className="join-game-modal"
+      onClick={() => onClose?.()}
+    >
+      <div 
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2>Join Game</h2>
         <div className="form-group">
           <label htmlFor="room-code">Room Code</label>

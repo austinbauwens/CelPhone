@@ -264,8 +264,24 @@ export function LobbyScreen({ gameId, playerId, onGameJoined, onGameStatusChange
             </button>
           </div>
         </div>
-        {showCreate && <CreateGame onGameCreated={handleGameCreated} />}
-        {showJoin && <JoinGame onGameJoined={handleGameJoined} />}
+        {showCreate && (
+          <CreateGame 
+            onGameCreated={handleGameCreated} 
+            onClose={() => {
+              soundManager.playClick();
+              setShowCreate(false);
+            }}
+          />
+        )}
+        {showJoin && (
+          <JoinGame 
+            onGameJoined={handleGameJoined} 
+            onClose={() => {
+              soundManager.playClick();
+              setShowJoin(false);
+            }}
+          />
+        )}
       </div>
     );
   }

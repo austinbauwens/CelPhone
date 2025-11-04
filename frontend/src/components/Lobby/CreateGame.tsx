@@ -5,9 +5,10 @@ import type { FramesPerRound } from '../../types';
 
 interface CreateGameProps {
   onGameCreated: (gameId: string, playerId: string) => void;
+  onClose?: () => void;
 }
 
-export function CreateGame({ onGameCreated }: CreateGameProps) {
+export function CreateGame({ onGameCreated, onClose }: CreateGameProps) {
   const [nickname, setNickname] = useState('');
   const [framesPerRound, setFramesPerRound] = useState<FramesPerRound>(3);
   const [loading, setLoading] = useState(false);
@@ -66,8 +67,14 @@ export function CreateGame({ onGameCreated }: CreateGameProps) {
   };
 
   return (
-    <div className="create-game-modal">
-      <div className="modal-content">
+    <div 
+      className="create-game-modal"
+      onClick={() => onClose?.()}
+    >
+      <div 
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2>Create Game</h2>
         <div className="form-group">
           <label htmlFor="nickname">Nickname</label>
