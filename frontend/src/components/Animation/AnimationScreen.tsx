@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { AnimationGallery } from './AnimationGallery';
 import { useGame } from '../../hooks/useGame';
 import { supabase } from '../../lib/supabase';
-import type { Frame, Prompt, Player } from '../../types';
+import { soundManager } from '../../lib/sounds';
+import type { Frame, Prompt, Player, Round } from '../../types';
 
 interface AnimationScreenProps {
   gameId: string;
@@ -13,6 +14,9 @@ interface AnimationScreenProps {
 export function AnimationScreen({ gameId, onStatusChange }: AnimationScreenProps) {
   const { game } = useGame(gameId);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [_rounds, setRounds] = useState<Round[]>([]);
+  const [_allRoundsFrames, setAllRoundsFrames] = useState<Record<number, Frame[]>>({});
+  const [_allRoundsPrompts, setAllRoundsPrompts] = useState<Record<number, Prompt[]>>({});
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [playerChains, setPlayerChains] = useState<Record<string, Array<{ round: number; prompt: Prompt | null; promptAuthor: Player | null; animation: Frame[]; animationAuthor: Player | null }>>>({});
 

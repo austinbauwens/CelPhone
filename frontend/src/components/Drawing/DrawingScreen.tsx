@@ -26,6 +26,8 @@ export function DrawingScreen({ gameId, playerId, onStatusChange }: DrawingScree
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submissionProgress, setSubmissionProgress] = useState({ submitted: 0, total: 0 });
   const [allFramesComplete, setAllFramesComplete] = useState(false);
+  const [_players, setPlayers] = useState<Player[]>([]);
+  const [_currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
 
   // Define checkAndTransitionToViewing BEFORE it's used in useEffect
   const checkAndTransitionToViewing = useCallback(async () => {

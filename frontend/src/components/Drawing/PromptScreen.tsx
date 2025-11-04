@@ -3,7 +3,6 @@ import { PromptInput } from './PromptInput';
 import { AnimationViewer } from '../Animation/AnimationViewer';
 import { useGame } from '../../hooks/useGame';
 import { supabase } from '../../lib/supabase';
-import { soundManager } from '../../lib/sounds';
 import type { Round, Frame, Player, Prompt } from '../../types';
 
 interface PromptScreenProps {
@@ -15,6 +14,8 @@ interface PromptScreenProps {
 export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenProps) {
   const { game } = useGame(gameId);
   const [frames, setFrames] = useState<Frame[]>([]);
+  const [_players, setPlayers] = useState<Player[]>([]);
+  const [_round, setRound] = useState<Round | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [previousPlayer, setPreviousPlayer] = useState<Player | null>(null);
   const [currentPrompt, setCurrentPrompt] = useState<Prompt | null>(null);

@@ -189,7 +189,7 @@ export function LobbyScreen({ gameId, playerId, onGameJoined, onGameStatusChange
       }
 
       // Create first round - game starts with prompt writing phase (like Gartic Phone)
-      const { data: round, error: roundError } = await supabase
+      const { data: _round, error: roundError } = await supabase
         .from('rounds')
         .insert({
           game_id: gameId,
