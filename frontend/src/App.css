@@ -39,7 +39,8 @@
 /* Layer 1 - Far stars (small, slow, subtle) */
 .stars-layer-1 {
   opacity: 0.15;
-  transform: translate(calc(var(--parallax-x-1, 0px) * 0.1), calc(var(--parallax-y-1, 0px) * 0.1));
+  transform: translate3d(calc(var(--parallax-x-1, 0px) * 0.1), calc(var(--parallax-y-1, 0px) * 0.1), 0);
+  will-change: transform, opacity;
   background-image: 
     radial-gradient(2px 2px at 8% 12%, var(--color-text), transparent),
     radial-gradient(1px 1px at 15% 25%, var(--color-text), transparent),
@@ -69,7 +70,8 @@
 /* Layer 2 - Medium stars (medium size, medium speed) */
 .stars-layer-2 {
   opacity: 0.25;
-  transform: translate(calc(var(--parallax-x-2, 0px) * 0.3), calc(var(--parallax-y-2, 0px) * 0.3));
+  transform: translate3d(calc(var(--parallax-x-2, 0px) * 0.3), calc(var(--parallax-y-2, 0px) * 0.3), 0);
+  will-change: transform, opacity;
   background-image: 
     radial-gradient(3px 3px at 10% 20%, var(--color-text), transparent),
     radial-gradient(2px 2px at 18% 45%, var(--color-text), transparent),
@@ -99,7 +101,8 @@
 /* Layer 3 - Close stars (large, fast, more visible) */
 .stars-layer-3 {
   opacity: 0.35;
-  transform: translate(calc(var(--parallax-x-3, 0px) * 0.5), calc(var(--parallax-y-3, 0px) * 0.5));
+  transform: translate3d(calc(var(--parallax-x-3, 0px) * 0.5), calc(var(--parallax-y-3, 0px) * 0.5), 0);
+  will-change: transform, opacity;
   background-image: 
     radial-gradient(4px 4px at 12% 15%, var(--color-text), transparent),
     radial-gradient(3px 3px at 20% 35%, var(--color-text), transparent),

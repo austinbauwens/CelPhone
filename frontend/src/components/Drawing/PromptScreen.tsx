@@ -25,6 +25,8 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
   const timerInitializedRef = useRef(false); // Track if timer has been initialized for this round
   const currentPromptRef = useRef<Prompt | null>(null); // Track current prompt to avoid closure issues
   const lastGameStatusRef = useRef<string | null>(null); // Track last game status for polling
+  const timerStartRef = useRef<number | null>(null); // Track when timer started
+  const timerDurationRef = useRef<number>(60); // Track initial duration
 
   useEffect(() => {
     if (!game) return;
@@ -176,73 +178,205 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
     }
   }, [gameId, game, playerId]); // Removed currentPrompt from deps to prevent re-runs when prompt is set
 
+  // Robust helper to verify all players have submitted (shared logic with DrawingScreen)
+  const verifyAllPlayersSubmitted = useCallback(async (
+    phase: 'drawing' | 'prompt',
+    roundNumber: number,
+    maxRetries: number = 3
+  ): Promise<{ allSubmitted: boolean; playerCount: number; submittedCount: number; missingPlayers: string[] }> => {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Get all players with retry
+        const { data: allPlayers, error: playersError } = await supabase
+          .from('players')
+          .select('id, nickname')
+          .eq('game_id', gameId)
+          .order('turn_order', { ascending: true });
+
+        if (playersError) {
+          console.error(`[verifyAllPlayersSubmitted] Attempt ${attempt + 1}: Error fetching players:`, playersError);
+          if (attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+            continue;
+          }
+          return { allSubmitted: false, playerCount: 0, submittedCount: 0, missingPlayers: [] };
+        }
+
+        const playerCount = allPlayers?.length || 0;
+        if (playerCount === 0) {
+          console.warn('[verifyAllPlayersSubmitted] No players found in game');
+          return { allSubmitted: false, playerCount: 0, submittedCount: 0, missingPlayers: [] };
+        }
+
+        const allPlayerIds = new Set(allPlayers.map(p => p.id));
+
+        // Check submissions based on phase
+        let submissions: any[] = [];
+        if (phase === 'drawing') {
+          const { data: submittedDrawings, error: submissionsError } = await supabase
+            .from('player_submissions')
+            .select('player_id')
+            .eq('game_id', gameId)
+            .eq('round_number', roundNumber)
+            .eq('phase', 'drawing');
+
+          if (submissionsError) {
+            console.error(`[verifyAllPlayersSubmitted] Attempt ${attempt + 1}: Error checking submissions:`, submissionsError);
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+              continue;
+            }
+            return { allSubmitted: false, playerCount, submittedCount: 0, missingPlayers: Array.from(allPlayerIds) };
+          }
+          submissions = submittedDrawings || [];
+        } else {
+          // Prompt phase
+          const { data: submittedPrompts, error: promptsError } = await supabase
+            .from('prompts')
+            .select('player_id')
+            .eq('game_id', gameId)
+            .eq('round_number', roundNumber);
+
+          if (promptsError) {
+            console.error(`[verifyAllPlayersSubmitted] Attempt ${attempt + 1}: Error checking prompts:`, promptsError);
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+              continue;
+            }
+            return { allSubmitted: false, playerCount, submittedCount: 0, missingPlayers: Array.from(allPlayerIds) };
+          }
+          submissions = submittedPrompts || [];
+        }
+
+        // Get unique submitted player IDs
+        const submittedPlayerIds = new Set(submissions.map(s => s.player_id));
+        const submittedCount = submittedPlayerIds.size;
+
+        // Find missing players
+        const missingPlayers = Array.from(allPlayerIds).filter(id => !submittedPlayerIds.has(id));
+        const missingPlayerNames = missingPlayers
+          .map(id => allPlayers.find(p => p.id === id)?.nickname || id)
+          .filter(Boolean);
+
+        // Verify completeness
+        const allSubmitted = submittedCount >= playerCount && missingPlayers.length === 0;
+
+        if (!allSubmitted && attempt < maxRetries - 1) {
+          console.log(`[verifyAllPlayersSubmitted] Attempt ${attempt + 1}: Not all players submitted. Missing: ${missingPlayerNames.join(', ')}`);
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          continue;
+        }
+
+        return {
+          allSubmitted,
+          playerCount,
+          submittedCount,
+          missingPlayers: missingPlayerNames
+        };
+      } catch (error) {
+        console.error(`[verifyAllPlayersSubmitted] Attempt ${attempt + 1} failed:`, error);
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+          continue;
+        }
+      }
+    }
+
+    return { allSubmitted: false, playerCount: 0, submittedCount: 0, missingPlayers: [] };
+  }, [gameId]);
+
   // Define checkAndTransitionToDrawing BEFORE it's used in useEffect
   const checkAndTransitionToDrawing = useCallback(async () => {
     if (!game) return;
 
-    console.log('checkAndTransitionToDrawing called for round', game.current_round);
+    const currentRound = game.current_round || 1;
+    console.log('[checkAndTransitionToDrawing] Checking for round', currentRound);
 
-    // Get all players
-    const { data: allPlayers, error: playersError } = await supabase
-      .from('players')
-      .select('id')
-      .eq('game_id', gameId);
-
-    if (playersError) {
-      console.error('Error fetching players:', playersError);
-      return;
+    // Robust verification with retries
+    const verification = await verifyAllPlayersSubmitted('prompt', currentRound, 3);
+    
+    setSubmissionProgress({ submitted: verification.submittedCount, total: verification.playerCount });
+    console.log(`[checkAndTransitionToDrawing] Prompts submitted: ${verification.submittedCount}/${verification.playerCount} for round ${currentRound}`);
+    
+    if (verification.missingPlayers.length > 0) {
+      console.log(`[checkAndTransitionToDrawing] Missing players: ${verification.missingPlayers.join(', ')}`);
     }
 
-    const playerCount = allPlayers?.length || 0;
-    if (playerCount === 0) {
-      console.log('No players found');
-      return;
-    }
-
-    // Check how many prompts have been submitted for this round
-    const { data: submittedPrompts, error: promptsError } = await supabase
-      .from('prompts')
-      .select('player_id')
-      .eq('game_id', gameId)
-      .eq('round_number', game.current_round || 1);
-
-    if (promptsError) {
-      console.error('Error checking prompts:', promptsError);
-      return;
-    }
-
-    const submittedCount = submittedPrompts?.length || 0;
-    setSubmissionProgress({ submitted: submittedCount, total: playerCount });
-    console.log(`Prompts submitted: ${submittedCount}/${playerCount} for round ${game.current_round}`);
-
-    // If all players have submitted, move to drawing phase
-    // Use a transaction-like approach: only update if status is still 'prompt'
-    if (submittedCount >= playerCount) {
-      console.log('All prompts submitted, checking game status...');
+    // If all players have submitted (with verification), move to drawing phase
+    if (verification.allSubmitted && verification.submittedCount >= verification.playerCount) {
+      console.log('[checkAndTransitionToDrawing] All prompts submitted, checking game status...');
+      
+      // Double-check current game status
       const { data: currentGame, error: gameError } = await supabase
         .from('games')
-        .select('status')
+        .select('status, current_round')
         .eq('id', gameId)
         .single();
 
-      if (!gameError && currentGame && currentGame.status === 'prompt') {
-        const { error: updateError } = await supabase
-          .from('games')
-          .update({ status: 'drawing' })
-          .eq('id', gameId)
-          .eq('status', 'prompt'); // Only update if still in prompt status (prevents race conditions)
+      if (gameError) {
+        console.error('[checkAndTransitionToDrawing] Error fetching game:', gameError);
+        return;
+      }
 
-        if (!updateError) {
-          console.log('Successfully updated game status to drawing, transitioning...');
-          onStatusChange('drawing');
-        } else {
-          console.error('Error updating game status:', updateError);
+      // Final verification: Double-check all players are still accounted for
+      const finalVerification = await verifyAllPlayersSubmitted('prompt', currentRound, 2);
+      if (!finalVerification.allSubmitted) {
+        console.warn('[checkAndTransitionToDrawing] Final verification failed. Missing players:', finalVerification.missingPlayers);
+        setSubmissionProgress({ submitted: finalVerification.submittedCount, total: finalVerification.playerCount });
+        return;
+      }
+
+      // Verify we're still on the same round and status
+      if (currentGame && currentGame.status === 'prompt' && currentGame.current_round === currentRound) {
+        // Move to drawing phase with retry mechanism
+        let updateSuccess = false;
+        for (let retry = 0; retry < 3; retry++) {
+          const { error: updateError } = await supabase
+            .from('games')
+            .update({ status: 'drawing' })
+            .eq('id', gameId)
+            .eq('status', 'prompt')
+            .eq('current_round', currentRound);
+
+          if (!updateError) {
+            console.log('[checkAndTransitionToDrawing] Successfully updated game status to drawing, transitioning...');
+            onStatusChange('drawing');
+            updateSuccess = true;
+            break;
+          } else {
+            console.warn(`[checkAndTransitionToDrawing] Status update attempt ${retry + 1} failed:`, updateError);
+            // Check if another player already updated
+            const { data: latestGame } = await supabase
+              .from('games')
+              .select('status, current_round')
+              .eq('id', gameId)
+              .single();
+            
+            if (latestGame && latestGame.status === 'drawing' && latestGame.current_round === currentRound) {
+              console.log('[checkAndTransitionToDrawing] Status already updated to drawing by another player');
+              onStatusChange('drawing');
+              updateSuccess = true;
+              break;
+            }
+            
+            if (retry < 2) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * (retry + 1)));
+            }
+          }
+        }
+
+        if (!updateSuccess) {
+          console.error('[checkAndTransitionToDrawing] Failed to update status after all retries. Will retry on next poll.');
         }
       } else {
-        console.log('Game status is not prompt, cannot transition. Current status:', currentGame?.status);
+        console.log(`[checkAndTransitionToDrawing] Game status mismatch. Current: ${currentGame?.status}, Round: ${currentGame?.current_round}, Expected: prompt/${currentRound}`);
+        // If status changed, update UI to match
+        if (currentGame?.status === 'drawing') {
+          onStatusChange('drawing');
+        }
       }
     }
-  }, [game, gameId, onStatusChange]);
+  }, [game, gameId, onStatusChange, verifyAllPlayersSubmitted]);
 
   // Always poll for prompt submission progress when in prompt phase
   // This ensures we detect when all players submit, even if one player's polling fails
@@ -258,8 +392,8 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
 
     console.log('[PromptScreen] Starting polling for prompt completion (always active)...');
     
-    // Always poll every 1 second to check submission progress
-    // This ensures we detect submissions immediately, even from other players
+    // Poll every 2 seconds to reduce CPU usage while still being responsive
+    // This ensures we detect submissions even from other players
     const pollInterval = setInterval(async () => {
       try {
         // Get all players
@@ -303,7 +437,7 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
       } catch (err) {
         console.error('[PromptScreen] Error in polling for prompt completion:', err);
       }
-    }, 1000); // Poll every 1 second for responsiveness
+    }, 2000); // Poll every 2 seconds to reduce CPU usage
 
     // Also check immediately on mount
     checkAndTransitionToDrawing();
@@ -390,7 +524,7 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
       } catch (err) {
         console.error('Error polling game status:', err);
       }
-    }, 1000); // Poll every second
+    }, 2000); // Poll every 2 seconds to reduce CPU usage
 
     // Try realtime subscription (optional optimization)
     try {
@@ -525,7 +659,18 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
     await checkAndTransitionToDrawing();
   }, [game, currentPlayer, currentPrompt, gameId, playerId, checkAndTransitionToDrawing]);
 
-  // Timer for prompt writing - only run if player hasn't submitted yet
+  // Initialize timer start time when round changes
+  useEffect(() => {
+    if (game && game.status === 'prompt' && !currentPromptRef.current && timeRemaining > 0) {
+      const currentRound = game.current_round || 1;
+      if (initializedRoundRef.current === currentRound) {
+        timerStartRef.current = Date.now();
+        timerDurationRef.current = timeRemaining;
+      }
+    }
+  }, [game?.current_round, game?.status, timeRemaining]);
+
+  // Real-time accurate timer using Date-based calculation
   useEffect(() => {
     if (!game || game.status !== 'prompt') return;
     
@@ -538,15 +683,24 @@ export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenP
       return;
     }
 
+    if (timerStartRef.current === null) {
+      timerStartRef.current = Date.now();
+      timerDurationRef.current = timeRemaining;
+    }
+
+    // Update timer every 100ms for smooth display, but calculate based on elapsed time
     const timer = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          handlePromptSubmit('');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      if (timerStartRef.current === null) return;
+      
+      const elapsed = Math.floor((Date.now() - timerStartRef.current) / 1000);
+      const remaining = Math.max(0, timerDurationRef.current - elapsed);
+      
+      setTimeRemaining(remaining);
+      
+      if (remaining <= 0) {
+        handlePromptSubmit('');
+      }
+    }, 100); // Update every 100ms for smooth display
 
     return () => clearInterval(timer);
   }, [timeRemaining, game, handlePromptSubmit]); // Use ref instead of currentPrompt in deps
