@@ -11,7 +11,7 @@ interface LobbyScreenProps {
   gameId: string | null;
   playerId: string | null;
   onGameJoined: (gameId: string, playerId: string) => void;
-  onGameStatusChange: (status: 'lobby' | 'drawing' | 'viewing' | 'complete') => void;
+  onGameStatusChange: (status: 'lobby' | 'drawing' | 'viewing' | 'complete' | 'prompt') => void;
 }
 
 export function LobbyScreen({ gameId, playerId, onGameJoined, onGameStatusChange }: LobbyScreenProps) {

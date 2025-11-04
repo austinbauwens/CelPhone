@@ -5,7 +5,7 @@ export interface Game {
   frames_per_round: number; // 3, 5, or 8
   current_round: number;
   total_rounds: number;
-  status: 'lobby' | 'drawing' | 'viewing' | 'complete';
+  status: 'lobby' | 'drawing' | 'viewing' | 'complete' | 'prompt';
   created_at: string;
   updated_at: string;
 }

@@ -14,12 +14,10 @@ interface PromptScreenProps {
 
 export function PromptScreen({ gameId, playerId, onStatusChange }: PromptScreenProps) {
   const { game } = useGame(gameId);
-  const [round, setRound] = useState<Round | null>(null);
   const [frames, setFrames] = useState<Frame[]>([]);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [previousPlayer, setPreviousPlayer] = useState<Player | null>(null);
   const [currentPrompt, setCurrentPrompt] = useState<Prompt | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
   const [timeRemaining, setTimeRemaining] = useState(60); // 60 seconds for prompt writing
   const [submissionProgress, setSubmissionProgress] = useState({ submitted: 0, total: 0 });
   const initializedRoundRef = useRef<number | null>(null); // Track which round we've initialized for

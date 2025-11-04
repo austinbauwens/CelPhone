@@ -6,7 +6,7 @@ interface GIFGeneratorProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
 }
 
-export function GIFGenerator({ frames, canvasRef }: GIFGeneratorProps) {
+export function GIFGenerator({ frames }: GIFGeneratorProps) {
   const handleDownload = async () => {
     if (frames.length === 0) {
       alert('No frames to download');
@@ -132,10 +132,8 @@ export function GIFGenerator({ frames, canvasRef }: GIFGeneratorProps) {
         }
       });
 
-      gif.on('error', (err: Error) => {
-        console.error('GIF generation error:', err);
-        alert('Failed to generate GIF: ' + err.message);
-      });
+      // Note: gif.js error handling is done via try-catch
+      // The 'error' event may not be available in all versions
 
       console.log(`Starting GIF generation for ${frames.length} frames...`);
       gif.render();

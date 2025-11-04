@@ -21,8 +21,6 @@ export function DrawingScreen({ gameId, playerId, onStatusChange }: DrawingScree
   const [currentFrame, setCurrentFrame] = useState(0);
   const [round, setRound] = useState<Round | null>(null);
   const [prompt, setPrompt] = useState<string>('Loading prompt...');
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(180); // 3 minutes in seconds
   const [completedFrames, setCompletedFrames] = useState<Set<number>>(new Set());
   const [isSubmitted, setIsSubmitted] = useState(false);

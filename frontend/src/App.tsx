@@ -4,7 +4,6 @@ import { DrawingScreen } from './components/Drawing/DrawingScreen';
 import { AnimationScreen } from './components/Animation/AnimationScreen';
 import { PromptScreen } from './components/Drawing/PromptScreen';
 import { ShimmerGrid } from './components/ShimmerGrid';
-import { supabase } from './lib/supabase';
 import './App.css';
 
 function App() {

@@ -57,7 +57,7 @@ export function CreateGame({ onGameCreated }: CreateGameProps) {
 
       if (playerError) throw playerError;
 
-      onGameCreated(game.id, player.id, roomCode);
+      onGameCreated(game.id, player.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create game');
     } finally {
